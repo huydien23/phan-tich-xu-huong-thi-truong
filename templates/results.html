@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kết quả Phân tích</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 40px;
+        }
+
+        .container {
+            max-width: 900px;
+        }
+
+        .sentiment-score {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .trend-box {
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+
+        .trend-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .conclusion {
+            white-space: pre-line;
+        }
+
+        .very_positive {
+            color: #28a745;
+        }
+
+        .positive {
+            color: #5cb85c;
+        }
+
+        .neutral {
+            color: #6c757d;
+        }
+
+        .negative {
+            color: #d9534f;
+        }
+
+        .very_negative {
+            color: #dc3545;
+        }
+
+        .summary-stats {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Kết quả Phân tích Xu hướng</h1>
+
+        <div class="summary-stats text-center">
+            <p>Đã phân tích thành công {{ thanh_cong }} / {{ tong_urls }} URL</p>
+        </div>
+
+        <div class="trend-box">
+            <div class="trend-title text-center 
+                {% if 'TĂNG MẠNH' in xu_huong %}very_positive
+                {% elif 'TĂNG' in xu_huong %}positive
+                {% elif 'GIẢM MẠNH' in xu_huong %}very_negative
+                {% elif 'GIẢM' in xu_huong %}negative
+                {% else %}neutral{% endif %}">
+                {{ xu_huong }}
+            </div>
+            <div class="conclusion">{{ ket_luan }}</div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Biểu đồ phân tích từ vựng</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('static', filename='bieu_do_so_sanh.png') }}" alt="Biểu đồ phân tích"
+                    class="img-fluid">
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Điểm cảm xúc trung bình</h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="sentiment-score
+                    {% if diem_trung_binh > 3 %}very_positive
+                    {% elif diem_trung_binh > 1 %}positive
+                    {% elif diem_trung_binh < -3 %}very_negative
+                    {% elif diem_trung_binh < -1 %}negative
+                    {% else %}neutral{% endif %}">
+                    {{ "%.2f"|format(diem_trung_binh) }}
+                </div>
+                <div class="progress mt-3">
+                    <div class="progress-bar bg-success" role="progressbar"
+                        style="width: {{ ((diem_trung_binh + 5) / 10 * 100)|round|int if diem_trung_binh > 0 else 50 }}%">
+                    </div>
+                    <div class="progress-bar bg-danger" role="progressbar"
+                        style="width: {{ ((5 - diem_trung_binh) / 10 * 100)|round|int if diem_trung_binh < 0 else 0 }}%">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between mt-1">
+                    <small>-5</small>
+                    <small>0</small>
+                    <small>+5</small>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="mb-3">Chi tiết phân tích</h2>
+
+        {% for result in results %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>{{ result.tieu_de }}</span>
+                {% if result.sentiment %}
+                <span class="badge {% if result.sentiment == 'very_positive' %}bg-success
+                              {% elif result.sentiment == 'positive' %}bg-success
+                              {% elif result.sentiment == 'neutral' %}bg-secondary
+                              {% elif result.sentiment == 'negative' %}bg-danger
+                              {% elif result.sentiment == 'very_negative' %}bg-danger{% endif %}">
+                    {{ {'very_positive': 'Rất tích cực', 'positive': 'Tích cực', 'neutral': 'Trung lập', 'negative':
+                    'Tiêu cực', 'very_negative': 'Rất tiêu cực', 'error': 'Lỗi'}[result.sentiment if result.sentiment
+                    else 'error'] }}
+                </span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p><small class="text-muted">{{ result.url }}</small></p>
+
+                {% if result.trang_thai != 'error' %}
+                <div class="row">
+                    <div class="col-md-4">
+                        <p>Số từ tích cực: <span class="text-success">{{ result.so_tu_tich_cuc }}</span></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p>Số từ tiêu cực: <span class="text-danger">{{ result.so_tu_tieu_cuc }}</span></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p>Điểm: <span class="{{ result.sentiment if result.sentiment else 'neutral' }}">{{
+                                "%.2f"|format(result.diem) }}</span></p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">Không thể phân tích URL này. Vui lòng kiểm tra lại hoặc thử URL khác.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-primary">Phân tích URL mới</a>
+            <a href="#" onclick="window.print();" class="btn btn-outline-secondary ms-2">In kết quả</a>
+        </div>
+
+        <div class="mt-4 text-center text-muted">
+            <small>© 2025 Phân tích Xu hướng Thị trường</small>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Xử lý lỗi nếu ảnh biểu đồ không tải được
+        document.addEventListener('DOMContentLoaded', function () {
+            const img = document.querySelector('img[alt="Biểu đồ phân tích"]');
+            img.onerror = function () {
+                this.onerror = null;
+                this.parentNode.innerHTML = '<div class="alert alert-warning">Không thể hiển thị biểu đồ. Vui lòng thử phân tích lại.</div>';
+            };
+        });
+    </script>
+</body>
+
+</html>

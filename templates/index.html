@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân tích Xu hướng Thị trường</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        .flash-message {
+            margin-top: 20px;
+        }
+
+        .url-help {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .url-example {
+            font-size: 0.8rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .invalid-url {
+            color: #dc3545;
+            font-size: 0.875em;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Phân tích Xu hướng Thị trường</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category if category != 'error' else 'danger' }} flash-message">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <div class="card-header">
+                Nhập các URL tin tức tài chính
+            </div>
+            <div class="card-body">
+                
+                <form action="/analyze" method="post" id="analyze-form">
+                    <div class="mb-3">
+                        <label for="urls" class="form-label">URLs (mỗi URL một dòng):</label>
+                        <textarea class="form-control" id="urls" name="urls" rows="8"
+                            placeholder="https://cafef.vn/some-news-article.html&#10;https://vnexpress.net/another-article.html"
+                            required></textarea>
+                        <div class="invalid-url" id="url-error">Vui lòng nhập URL hợp lệ (ví dụ: cafef.vn/bai-viet hoặc
+                            https://cafef.vn/bai-viet)</div>
+                        <div class="url-help mt-1">
+                            <p>Hỗ trợ phân tích từ các trang: cafef.vn, vnexpress.net, theleader.vn,
+                                tinnhanhchungkhoan.vn, ndh.vn và nhiều trang khác.</p>
+                        </div>
+                        <div class="url-example">
+                            <p>Bạn có thể dán URL dạng: cafef.vn/article hoặc https://cafef.vn/article</p>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="submit-btn">Phân tích</button>
+                    </div>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Đang phân tích...</span>
+                    </div>
+                    <p class="mt-2">Đang phân tích dữ liệu, vui lòng đợi...</p>
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                Hệ thống sẽ phân tích nội dung tin tức và đưa ra đánh giá xu hướng thị trường dựa trên cảm xúc
+            </div>
+        </div>
+
+        <div class="mt-4 text-center">
+            <div class="accordion" id="instructionsAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingOne">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                            Hướng dẫn sử dụng
+                        </button>
+                    </h2>
+                    <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne"
+                        data-bs-parent="#instructionsAccordion">
+                        <div class="accordion-body">
+                            <ol class="text-start">
+                                <li>Dán các URL tin tức tài chính vào ô văn bản (mỗi URL một dòng)</li>
+                                <li>Nhấn nút "Phân tích" và đợi hệ thống xử lý</li>
+                                <li>Xem kết quả phân tích và dự đoán xu hướng</li>
+                                <li>Để kết quả chính xác hơn, hãy sử dụng ít nhất 3-5 bài viết</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 text-center text-muted">
+            <small>© 2025 Phân tích Xu hướng Thị trường</small>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('analyze-form');
+            const urlsField = document.getElementById('urls');
+            const submitBtn = document.getElementById('submit-btn');
+            const loading = document.getElementById('loading');
+            const urlError = document.getElementById('url-error');
+
+            // Kiểm tra URL có hợp lệ không
+            function isValidUrl(value) {
+                // Ít nhất phải có tên miền và đường dẫn cơ bản
+                const domainRegex = /^(https?:\/\/)?([-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b)([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/;
+                return domainRegex.test(value);
+            }
+
+            // Kiểm tra các URL trước khi gửi form
+            form.addEventListener('submit', function (event) {
+                const urls = urlsField.value.split('\n').filter(url => url.trim());
+                let hasError = false;
+
+                if (urls.length === 0) {
+                    urlError.textContent = 'Vui lòng nhập ít nhất một URL';
+                    urlError.style.display = 'block';
+                    hasError = true;
+                } else {
+                    for (const url of urls) {
+                        if (!isValidUrl(url.trim())) {
+                            urlError.textContent = `URL không hợp lệ: ${url.trim()}`;
+                            urlError.style.display = 'block';
+                            hasError = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasError) {
+                    event.preventDefault();
+                } else {
+                    urlError.style.display = 'none';
+                    loading.style.display = 'block';
+                    submitBtn.disabled = true;
+                }
+            });
+
+            // Xóa thông báo lỗi khi người dùng thay đổi nội dung
+            urlsField.addEventListener('input', function () {
+                urlError.style.display = 'none';
+            });
+        });
+    </script>
+</body>
+
+</html>
